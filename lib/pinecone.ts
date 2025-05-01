@@ -46,7 +46,7 @@ export async function loadS3IntoPineCone(fileKey: string) {
 
   pineconeIndex.upsert(vectors as PineconeRecord[]);
 
-  return pages;
+  return documents[0];
 }
 
 async function embedDocument(doc: Document) {

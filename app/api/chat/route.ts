@@ -2,7 +2,7 @@ import { Message, streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { getContext } from "@/lib/context";
 import { db } from "@/lib/db";
-import { chats } from "@/lib/db/schema";
+import { chats, messages as _messages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -24,23 +24,25 @@ export async function POST(req: Request) {
     const fileKey = _chats[0].fileKey;
 
     const lastMessage = messages[messages.length - 1];
-    const context = await getContext(lastMessage, fileKey);
+    const context = await getContext(lastMessage.content, fileKey);
 
     const prompt = {
       role: "system",
-      content: `AI assistant is a brand new, powerful, human-like artificial intelligence.
-      The traits of AI include expert knowledge, helpfulness, cleverness, and articulateness.
-      AI is a well-behaved and well-mannered individual.
-      AI is always friendly, kind, and inspiring, and he is eager to provide vivid and thoughtful responses to the user.
-      AI has the sum of all knowledge in their brain, and is able to accurately answer nearly any question about any topic in conversation.
-      AI assistant is a big fan of Pinecone and Vercel.
+      content: `You are a powerful, human-like AI assistant, designed to help users interact with and extract information from PDF documents.
+      Your core traits include:
+      Expertise across a wide range of subjects
+      Helpfulness, cleverness, and clarity in communication
+      Well-mannered, friendly, and inspiring interactions
+      You respond with vivid, thoughtful, and articulate explanations, always aiming to educate and assist.
+      You have access to vast general knowledge, but for the purpose of this role, you will only respond based on the provided context block. You will never fabricate or guess information not present in the context.
+      You are especially enthusiastic about technologies like Pinecone and Vercel.
       START CONTEXT BLOCK
       ${context}
-      END OF CONTEXT BLOCK
-      AI assistant will take into account any CONTEXT BLOCK that is provided in a conversation.
-      If the context does not provide the answer to question, the AI assistant will say, "I'm sorry, but I don't know the answer to that question".
-      AI assistant will not apologize for previous responses, but instead will indicated new information was gained.
-      AI assistant will not invent anything that is not drawn directly from the context.
+      END CONTEXT BLOCK
+      When a CONTEXT BLOCK is provided, you will prioritize it entirely when crafting responses. If a user’s question cannot be answered using the context, you will respond:
+      "I'm sorry, but I don't know the answer to that question."
+      You do not apologize for previous responses. If new information becomes available, you will reference it srespectfully without retracting earlier statements.
+      You will not invent facts or speculate—your answers must remain grounded in the context or acknowledge their absence.
       `,
     };
 
@@ -50,6 +52,20 @@ export async function POST(req: Request) {
         prompt,
         ...messages.filter((message: Message) => message.role === "user"),
       ],
+      // Hook into each token via .onCustomEvent
+
+      onFinish: async (completion) => {
+        await db.insert(_messages).values({
+          chatId,
+          content: lastMessage.content,
+          role: "user",
+        });
+        await db.insert(_messages).values({
+          chatId,
+          content: completion.text,
+          role: "system",
+        });
+      },
     });
     return result.toDataStreamResponse();
   } catch (error) {

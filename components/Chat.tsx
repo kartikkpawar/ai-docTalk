@@ -5,15 +5,29 @@ import { useChat } from "@ai-sdk/react";
 import { Button } from "./ui/button";
 import { SendIcon } from "lucide-react";
 import MessageList from "./MessageList";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
+import { Message } from "ai";
 
 type Props = { chatId: number };
 
 const Chat = ({ chatId }: Props) => {
+  const { data, isLoading } = useQuery({
+    queryKey: ["chat", chatId],
+    queryFn: async () => {
+      const response = await axios.post<Message[]>("/api/get-messages", {
+        chatId,
+      });
+      return response.data;
+    },
+  });
+
   const { input, handleInputChange, handleSubmit, messages } = useChat({
     api: "/api/chat",
     body: {
       chatId,
     },
+    initialMessages: data || [],
   });
 
   return (
@@ -35,7 +49,7 @@ const Chat = ({ chatId }: Props) => {
           <SendIcon className="h-4 w-4" />
         </Button>
       </form>
-      <MessageList messages={messages} />
+      <MessageList messages={messages} isLoading={isLoading} />
     </div>
   );
 };

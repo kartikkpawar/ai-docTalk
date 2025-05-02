@@ -8,6 +8,7 @@ import {
 import { getEmbeddings } from "./embeddings";
 import md5 from "md5";
 import { Vector } from "@pinecone-database/pinecone/dist/pinecone-generated-ts-fetch/db_data";
+import { convertToAscii } from "./utils";
 
 const pineconeClient = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
@@ -43,8 +44,9 @@ export async function loadS3IntoPineCone(fileKey: string) {
 
   // storing vectors in pinecone
   const pineconeIndex = pineconeClient.Index("doctalk");
+  const namespace = pineconeIndex.namespace(convertToAscii(fileKey));
 
-  pineconeIndex.upsert(vectors as PineconeRecord[]);
+  namespace.upsert(vectors as PineconeRecord[]);
 
   return documents[0];
 }
